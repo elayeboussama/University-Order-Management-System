@@ -110,9 +110,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   updateOrderPdf: async (orderId: string, newPdfUrl: string) => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from("orders")
-        .update({ pdfUrl: newPdfUrl })
+        .update({ pdf_url: newPdfUrl })
         .eq("id", orderId);
 
       if (error) throw error;

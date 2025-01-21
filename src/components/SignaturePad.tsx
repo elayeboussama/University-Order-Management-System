@@ -1,102 +1,89 @@
-import React, { useRef, useState } from 'react';
-import { X } from 'lucide-react';
+import { Dialog } from "@headlessui/react";
+import { X } from "lucide-react";
+import { useRef } from "react";
+import SignatureCanvas from "react-signature-canvas";
 
 interface SignaturePadProps {
+  open: boolean;
   onSave: (signatureData: string) => void;
-  onCancel: () => void;
+  onClose: () => void;
 }
 
-export function SignaturePad({ onSave, onCancel }: SignaturePadProps) {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const [isDrawing, setIsDrawing] = useState(false);
+export function SignaturePad({ open, onSave, onClose }: SignaturePadProps) {
+  const signaturePad = useRef<SignatureCanvas>(null);
 
-  const startDrawing = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    setIsDrawing(true);
-    const rect = canvas.getBoundingClientRect();
-    ctx.beginPath();
-    ctx.moveTo(e.clientX - rect.left, e.clientY - rect.top);
-  };
-
-  const draw = (e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!isDrawing) return;
-    
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    const rect = canvas.getBoundingClientRect();
-    ctx.lineTo(e.clientX - rect.left, e.clientY - rect.top);
-    ctx.stroke();
-  };
-
-  const stopDrawing = () => {
-    setIsDrawing(false);
+  const handleClear = () => {
+    signaturePad.current?.clear();
   };
 
   const handleSave = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const signatureData = canvas.toDataURL();
-    onSave(signatureData);
-  };
+    if (signaturePad.current?.isEmpty()) {
+      return;
+    }
 
-  const clearCanvas = () => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
-
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    // Get signature as PNG data URL, trimmed of white space
+    const signatureData = signaturePad.current
+      ?.getTrimmedCanvas()
+      .toDataURL("image/png");
+    if (signatureData) {
+      onSave(signatureData);
+    }
   };
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4">
-      <div className="bg-white rounded-lg p-6 w-full max-w-md">
-        <div className="flex justify-between items-center mb-4">
-          <h3 className="text-lg font-semibold">Digital Signature</h3>
-          <button onClick={onCancel} className="text-gray-500 hover:text-gray-700">
-            <X size={20} />
-          </button>
-        </div>
-        
-        <div className="border rounded-lg p-2 mb-4">
-          <canvas
-            ref={canvasRef}
-            width={400}
-            height={200}
-            className="border border-gray-200 rounded w-full"
-            onMouseDown={startDrawing}
-            onMouseMove={draw}
-            onMouseUp={stopDrawing}
-            onMouseLeave={stopDrawing}
-          />
-        </div>
+    <Dialog open={open} onClose={onClose} className="relative z-50">
+      <div className="fixed inset-0 bg-black/30" aria-hidden="true" />
 
-        <div className="flex gap-2">
-          <button
-            onClick={clearCanvas}
-            className="px-4 py-2 text-sm border border-gray-300 rounded-md hover:bg-gray-50"
-          >
-            Clear
-          </button>
-          <button
-            onClick={handleSave}
-            className="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700"
-          >
-            Save Signature
-          </button>
-        </div>
+      <div className="fixed inset-0 flex items-center justify-center p-4">
+        <Dialog.Panel className="mx-auto max-w-md w-full bg-white rounded-xl shadow-lg">
+          <div className="flex justify-between items-center p-6 border-b">
+            <Dialog.Title className="text-lg font-semibold">
+              Add Your Signature
+            </Dialog.Title>
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-500"
+            >
+              <X className="h-5 w-5" />
+            </button>
+          </div>
+
+          <div className="p-6">
+            <div className="border rounded-lg p-2 mb-4 bg-white">
+              <SignatureCanvas
+                ref={signaturePad}
+                canvasProps={{
+                  className: "signature-canvas w-full h-[200px]",
+                  style: {
+                    border: "1px solid #e5e7eb",
+                    borderRadius: "0.375rem",
+                    touchAction: "none",
+                  },
+                }}
+                backgroundColor="white"
+                penColor="black"
+              />
+            </div>
+
+            <div className="flex justify-end gap-2">
+              <button
+                onClick={handleClear}
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Clear
+              </button>
+              <button
+                onClick={handleSave}
+                type="button"
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+              >
+                Save Signature
+              </button>
+            </div>
+          </div>
+        </Dialog.Panel>
       </div>
-    </div>
+    </Dialog>
   );
 }
