@@ -40,7 +40,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       if (error) throw error;
 
       set({
-        orders: orders.map(order => ({
+        orders: orders.map((order) => ({
           id: order.id,
           title: order.title,
           description: order.description,
@@ -50,14 +50,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
           documentPath: order.document_path,
           department: order.department,
           notes: order.notes,
+          pdfUrl: order.pdf_url,
           signatures: order.signatures.map((sig: any) => ({
             id: sig.id,
             orderId: order.id,
             userId: sig.user_id,
             signatureData: sig.signature_data,
-            createdAt: sig.created_at
-          }))
-        }))
+            createdAt: sig.created_at,
+          })),
+        })),
       });
     } catch (error) {
       console.error('Error loading orders:', error);

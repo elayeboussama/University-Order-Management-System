@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, PlusCircle, Search, LogOut, PenTool } from 'lucide-react';
-import { OrderForm } from './OrderForm';
-import { SignaturePad } from './SignaturePad';
-import { useOrderStore } from '../stores/orderStore';
-import { useAuthStore } from '../stores/authStore';
-import toast from 'react-hot-toast';
-import { addSignatureToPdf } from '../utils/pdfUtils';
- 
+import {
+  FileText,
+  PlusCircle,
+  Search,
+  LogOut,
+  PenTool,
+  Download,
+} from "lucide-react";
+import { OrderForm } from "./OrderForm";
+import { SignaturePad } from "./SignaturePad";
+import { useOrderStore } from "../stores/orderStore";
+import { useAuthStore } from "../stores/authStore";
+import toast from "react-hot-toast";
+import { addSignatureToPdf } from "../utils/pdfUtils";
 
 export function OrderDashboard() {
-  const { orders, loading, loadOrders, addSignature, updateOrderPdf } = useOrderStore();
+  const { orders, loading, loadOrders, addSignature, updateOrderPdf } =
+    useOrderStore();
   const { user, signOut } = useAuthStore();
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadOrders();
@@ -25,9 +32,9 @@ export function OrderDashboard() {
 
     try {
       // Get the order's PDF URL
-      const order = orders.find(o => o.id === selectedOrder);
+      const order = orders.find((o) => o.id === selectedOrder);
       if (!order?.pdfUrl) {
-        throw new Error('PDF not found');
+        throw new Error("PDF not found");
       }
 
       // First add signature to the database
@@ -37,40 +44,66 @@ export function OrderDashboard() {
       const updatedPdfUrl = await addSignatureToPdf({
         pdfUrl: order.pdfUrl,
         signatureData,
-        signerRole: user?.role || '',
-        signerName: user?.fullName || '',
-        coordinates: getSignatureCoordinates(user?.role || '') // Helper to determine where to place signature
+        signerRole: user?.role || "",
+        signerName: user?.fullName || "",
+        coordinates: getSignatureCoordinates(user?.role || ""), // Helper to determine where to place signature
       });
 
       // Update the order with new PDF URL
       await updateOrderPdf(selectedOrder, updatedPdfUrl);
-      
-      toast.success('Signature added successfully');
+
+      toast.success("Signature added successfully");
       setShowSignaturePad(false);
       setSelectedOrder(null);
     } catch (error) {
-      console.error('Signature error:', error);
-      toast.error('Failed to add signature');
+      console.error("Signature error:", error);
+      toast.error("Failed to add signature");
     }
   };
 
   // Helper function to determine signature placement based on role
   const getSignatureCoordinates = (role: string): { x: number; y: number } => {
     switch (role) {
-      case 'director':
+      case "director":
         return { x: 400, y: 100 }; // Adjust these values based on your PDF layout
-      case 'secretary':
+      case "secretary":
         return { x: 400, y: 200 };
-      case 'responsible':
+      case "responsible":
         return { x: 400, y: 300 };
       default:
         return { x: 400, y: 400 };
     }
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.department.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleDownloadPdf = async (pdfUrl: string, orderTitle: string) => {
+     
+
+    try {
+      const response = await fetch(pdfUrl);
+      const blob = await response.blob();
+      console.log(pdfUrl);
+      // Create a temporary link element
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${orderTitle}.pdf`; // Set the download filename
+
+      // Programmatically click the link to trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast.error("Failed to download PDF");
+    }
+  };
+
+  const filteredOrders = orders.filter(
+    (order) =>
+      order.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleLogout = async () => {
@@ -162,9 +195,18 @@ export function OrderDashboard() {
                     <div className="flex items-center">
                       <FileText className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">
-                          {order.title}
-                        </div>
+                        <button
+                          onClick={() => 
+                            order.pdfUrl &&
+                              handleDownloadPdf(order.pdfUrl, order.title)
+                          }
+                          className="group flex items-center"
+                        >
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                            {order.title}
+                          </div>
+                          <Download className="h-4 w-4 ml-1 text-gray-400 group-hover:text-blue-600" />
+                        </button>
                         <div className="text-sm text-gray-500">
                           {order.submittedBy}
                         </div>
