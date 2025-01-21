@@ -5,7 +5,6 @@ import {
   PenTool,
   PlusCircle,
   Search,
-  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -98,18 +97,6 @@ export function OrderDashboard() {
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast.error("Failed to download PDF");
-    }
-  };
-
-  const handleDelete = async (orderId: string) => {
-    try {
-      if (window.confirm("Are you sure you want to delete this order?")) {
-        await useOrderStore.getState().deleteOrder(orderId);
-        toast.success("Order deleted successfully");
-      }
-    } catch (error) {
-      console.error("Error deleting order:", error);
-      toast.error("Failed to delete order");
     }
   };
 

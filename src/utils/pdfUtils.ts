@@ -87,7 +87,7 @@ async function uploadPdfToStorage(base64Pdf: string): Promise<string> {
     const filename = `signatures/${Date.now()}-signed.pdf`;
 
     // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
+    const { error } = await supabase.storage
       .from("documents")
       .upload(filename, pdfBlob, {
         contentType: "application/pdf",
