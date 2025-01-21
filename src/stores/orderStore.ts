@@ -1,6 +1,7 @@
-import { create } from 'zustand';
-import { supabase } from '../lib/supabase';
-import type { Order } from '../types';
+import { create } from "zustand";
+import { supabase } from "../lib/supabase";
+import type { Order } from "../types";
+import { useAuthStore } from "./authStore";
 
 interface OrderState {
   orders: Order[];
@@ -25,8 +26,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
     set({ loading: true });
     try {
       const { data: orders, error } = await supabase
-        .from('orders')
-        .select(`
+        .from("orders")
+        .select(
+          `
           *,
           signatures (
             id,
@@ -34,8 +36,9 @@ export const useOrderStore = create<OrderState>((set, get) => ({
             signature_data,
             created_at
           )
-        `)
-        .order('created_at', { ascending: false });
+        `
+        )
+        .order("created_at", { ascending: false });
 
       if (error) throw error;
 
@@ -61,7 +64,7 @@ export const useOrderStore = create<OrderState>((set, get) => ({
         })),
       });
     } catch (error) {
-      console.error('Error loading orders:', error);
+      console.error("Error loading orders:", error);
     } finally {
       set({ loading: false });
     }
@@ -69,13 +72,18 @@ export const useOrderStore = create<OrderState>((set, get) => ({
 
   createOrder: async (formData) => {
     try {
-      const { error: orderError } = await supabase.from('orders').insert({
+      const { user } = useAuthStore.getState();
+      if (!user) throw new Error("User not authenticated");
+
+      const { error: orderError } = await supabase.from("orders").insert({
         title: formData.title,
         description: formData.description,
         department: formData.department,
         document_path: formData.documentPath,
         pdf_url: formData.pdfUrl,
-        status: 'pending'
+        status: "pending",
+        submitted_by: user.id,
+        submitted_at: new Date().toISOString(),
       });
 
       if (orderError) throw orderError;
@@ -83,15 +91,15 @@ export const useOrderStore = create<OrderState>((set, get) => ({
       // Reload orders
       await get().loadOrders();
     } catch (error) {
-      console.error('Error creating order:', error);
+      console.error("Error creating order:", error);
       throw error;
     }
   },
 
   addSignature: async (orderId: string, signatureData: string) => {
-    const { error } = await supabase.from('signatures').insert({
+    const { error } = await supabase.from("signatures").insert({
       order_id: orderId,
-      signature_data: signatureData
+      signature_data: signatureData,
     });
 
     if (error) throw error;
@@ -103,22 +111,20 @@ export const useOrderStore = create<OrderState>((set, get) => ({
   updateOrderPdf: async (orderId: string, newPdfUrl: string) => {
     try {
       const { data, error } = await supabase
-        .from('orders')
+        .from("orders")
         .update({ pdfUrl: newPdfUrl })
-        .eq('id', orderId);
+        .eq("id", orderId);
 
       if (error) throw error;
 
       set((state) => ({
-        orders: state.orders.map(order =>
-          order.id === orderId
-            ? { ...order, pdfUrl: newPdfUrl }
-            : order
-        )
+        orders: state.orders.map((order) =>
+          order.id === orderId ? { ...order, pdfUrl: newPdfUrl } : order
+        ),
       }));
     } catch (error) {
-      console.error('Error updating PDF:', error);
+      console.error("Error updating PDF:", error);
       throw error;
     }
-  }
+  },
 }));
