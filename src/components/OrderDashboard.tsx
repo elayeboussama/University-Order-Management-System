@@ -5,6 +5,7 @@ import {
   PenTool,
   PlusCircle,
   Search,
+  Trash2,
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import toast from "react-hot-toast";
@@ -27,36 +28,38 @@ export function OrderDashboard() {
     loadOrders();
   }, [loadOrders]);
 
-  const handleSignature = async (signatureData: string) => {
-    if (!selectedOrder) return;
-
+  const handleSignatureSave = async (signatureData: string) => {
     try {
-      // Get the order's PDF URL
+      if (!selectedOrder || !user) return;
+
       const order = orders.find((o) => o.id === selectedOrder);
       if (!order?.pdfUrl) {
-        throw new Error("PDF not found");
+        throw new Error("PDF URL not found");
       }
 
-      // First add signature to the database
-      await addSignature(selectedOrder, signatureData);
+      // Get signature coordinates based on user role
+      const coordinates = getSignatureCoordinates(user.role);
 
-      // Then add signature to the PDF
-      const updatedPdfUrl = await addSignatureToPdf({
+      // Add signature to PDF
+      const newPdfUrl = await addSignatureToPdf({
         pdfUrl: order.pdfUrl,
         signatureData,
-        signerRole: user?.role || "",
-        signerName: user?.fullName || "",
-        coordinates: getSignatureCoordinates(user?.role || ""), // Helper to determine where to place signature
+        signerRole: user.role,
+        signerName: user.fullName,
+        coordinates,
       });
 
-      // Update the order with new PDF URL
-      await updateOrderPdf(selectedOrder, updatedPdfUrl);
+      // Save signature to database
+      await addSignature(selectedOrder, signatureData);
+
+      // Update PDF URL in database
+      await updateOrderPdf(selectedOrder, newPdfUrl);
 
       toast.success("Signature added successfully");
       setShowSignaturePad(false);
       setSelectedOrder(null);
     } catch (error) {
-      console.error("Signature error:", error);
+      console.error("Error adding signature:", error);
       toast.error("Failed to add signature");
     }
   };
@@ -95,6 +98,18 @@ export function OrderDashboard() {
     } catch (error) {
       console.error("Error downloading PDF:", error);
       toast.error("Failed to download PDF");
+    }
+  };
+
+  const handleDelete = async (orderId: string) => {
+    try {
+      if (window.confirm("Are you sure you want to delete this order?")) {
+        await useOrderStore.getState().deleteOrder(orderId);
+        toast.success("Order deleted successfully");
+      }
+    } catch (error) {
+      console.error("Error deleting order:", error);
+      toast.error("Failed to delete order");
     }
   };
 
@@ -263,8 +278,9 @@ export function OrderDashboard() {
 
       {showSignaturePad && (
         <SignaturePad
-          onSave={handleSignature}
-          onCancel={() => {
+          open={showSignaturePad}
+          onSave={handleSignatureSave}
+          onClose={() => {
             setShowSignaturePad(false);
             setSelectedOrder(null);
           }}
