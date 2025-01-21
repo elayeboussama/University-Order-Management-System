@@ -1,20 +1,27 @@
 import React, { useEffect, useState } from 'react';
-import { FileText, PlusCircle, Search, LogOut, PenTool } from 'lucide-react';
-import { OrderForm } from './OrderForm';
-import { SignaturePad } from './SignaturePad';
-import { useOrderStore } from '../stores/orderStore';
-import { useAuthStore } from '../stores/authStore';
-import toast from 'react-hot-toast';
-import { addSignatureToPdf } from '../utils/pdfUtils';
- 
+import {
+  FileText,
+  PlusCircle,
+  Search,
+  LogOut,
+  PenTool,
+  Download,
+} from "lucide-react";
+import { OrderForm } from "./OrderForm";
+import { SignaturePad } from "./SignaturePad";
+import { useOrderStore } from "../stores/orderStore";
+import { useAuthStore } from "../stores/authStore";
+import toast from "react-hot-toast";
+import { addSignatureToPdf } from "../utils/pdfUtils";
 
 export function OrderDashboard() {
-  const { orders, loading, loadOrders, addSignature, updateOrderPdf } = useOrderStore();
+  const { orders, loading, loadOrders, addSignature, updateOrderPdf } =
+    useOrderStore();
   const { user, signOut } = useAuthStore();
   const [showOrderForm, setShowOrderForm] = useState(false);
   const [showSignaturePad, setShowSignaturePad] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<string | null>(null);
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
 
   useEffect(() => {
     loadOrders();
@@ -25,9 +32,9 @@ export function OrderDashboard() {
 
     try {
       // Get the order's PDF URL
-      const order = orders.find(o => o.id === selectedOrder);
+      const order = orders.find((o) => o.id === selectedOrder);
       if (!order?.pdfUrl) {
-        throw new Error('PDF not found');
+        throw new Error("PDF not found");
       }
 
       // First add signature to the database
@@ -37,40 +44,66 @@ export function OrderDashboard() {
       const updatedPdfUrl = await addSignatureToPdf({
         pdfUrl: order.pdfUrl,
         signatureData,
-        signerRole: user?.role || '',
-        signerName: user?.fullName || '',
-        coordinates: getSignatureCoordinates(user?.role || '') // Helper to determine where to place signature
+        signerRole: user?.role || "",
+        signerName: user?.fullName || "",
+        coordinates: getSignatureCoordinates(user?.role || ""), // Helper to determine where to place signature
       });
 
       // Update the order with new PDF URL
       await updateOrderPdf(selectedOrder, updatedPdfUrl);
-      
-      toast.success('Signature added successfully');
+
+      toast.success("Signature added successfully");
       setShowSignaturePad(false);
       setSelectedOrder(null);
     } catch (error) {
-      console.error('Signature error:', error);
-      toast.error('Failed to add signature');
+      console.error("Signature error:", error);
+      toast.error("Failed to add signature");
     }
   };
 
   // Helper function to determine signature placement based on role
   const getSignatureCoordinates = (role: string): { x: number; y: number } => {
     switch (role) {
-      case 'director':
+      case "director":
         return { x: 400, y: 100 }; // Adjust these values based on your PDF layout
-      case 'secretary':
+      case "secretary":
         return { x: 400, y: 200 };
-      case 'responsible':
+      case "responsible":
         return { x: 400, y: 300 };
       default:
         return { x: 400, y: 400 };
     }
   };
 
-  const filteredOrders = orders.filter(order =>
-    order.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    order.department.toLowerCase().includes(searchTerm.toLowerCase())
+  const handleDownloadPdf = async (pdfUrl: string, orderTitle: string) => {
+     
+
+    try {
+      const response = await fetch(pdfUrl);
+      const blob = await response.blob();
+      console.log(pdfUrl);
+      // Create a temporary link element
+      const link = document.createElement("a");
+      link.href = URL.createObjectURL(blob);
+      link.download = `${orderTitle}.pdf`; // Set the download filename
+
+      // Programmatically click the link to trigger download
+      document.body.appendChild(link);
+      link.click();
+
+      // Clean up
+      document.body.removeChild(link);
+      URL.revokeObjectURL(link.href);
+    } catch (error) {
+      console.error("Error downloading PDF:", error);
+      toast.error("Failed to download PDF");
+    }
+  };
+
+  const filteredOrders = orders.filter(
+    (order) =>
+      order.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      order.department.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleLogout = async () => {
@@ -91,13 +124,15 @@ export function OrderDashboard() {
         <div className="max-w-7xl mx-auto px-4 py-6">
           <div className="flex justify-between items-center">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900">Order Management System</h1>
+              <h1 className="text-3xl font-bold text-gray-900">
+                Order Management System
+              </h1>
               <p className="mt-1 text-sm text-gray-500">
                 Welcome, {user?.fullName} ({user?.role})
               </p>
             </div>
             <div className="flex items-center space-x-4">
-              {user?.role === 'staff' && (
+              {user?.role === "staff" && (
                 <button
                   onClick={() => setShowOrderForm(true)}
                   className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
@@ -136,11 +171,21 @@ export function OrderDashboard() {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Order</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Signatures</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Order
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Department
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Signatures
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Actions
+                </th>
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -150,18 +195,40 @@ export function OrderDashboard() {
                     <div className="flex items-center">
                       <FileText className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
-                        <div className="text-sm font-medium text-gray-900">{order.title}</div>
-                        <div className="text-sm text-gray-500">{order.submittedBy}</div>
+                        <button
+                          onClick={() => 
+                            order.pdfUrl &&
+                              handleDownloadPdf(order.pdfUrl, order.title)
+                          }
+                          className="group flex items-center"
+                        >
+                          <div className="text-sm font-medium text-gray-900 group-hover:text-blue-600">
+                            {order.title}
+                          </div>
+                          <Download className="h-4 w-4 ml-1 text-gray-400 group-hover:text-blue-600" />
+                        </button>
+                        <div className="text-sm text-gray-500">
+                          {order.submittedBy}
+                        </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-500">{order.department}</td>
+                  <td className="px-6 py-4 text-sm text-gray-500">
+                    {order.department}
+                  </td>
                   <td className="px-6 py-4">
-                    <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
-                      ${order.status === 'approved' ? 'bg-green-100 text-green-800' :
-                        order.status === 'rejected' ? 'bg-red-100 text-red-800' :
-                        order.status === 'processing' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-gray-100 text-gray-800'}`}>
+                    <span
+                      className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full
+                      ${
+                        order.status === "approved"
+                          ? "bg-green-100 text-green-800"
+                          : order.status === "rejected"
+                          ? "bg-red-100 text-red-800"
+                          : order.status === "processing"
+                          ? "bg-yellow-100 text-yellow-800"
+                          : "bg-gray-100 text-gray-800"
+                      }`}
+                    >
                       {order.status}
                     </span>
                   </td>
@@ -169,14 +236,16 @@ export function OrderDashboard() {
                     {order.signatures.length} / 2
                   </td>
                   <td className="px-6 py-4 text-sm font-medium">
-                    {['director', 'secretary', 'responsible'].includes(user?.role || '') && (
+                    {["director", "secretary", "responsible"].includes(
+                      user?.role || ""
+                    ) && (
                       <button
                         onClick={() => {
                           setSelectedOrder(order.id);
                           setShowSignaturePad(true);
                         }}
                         className="inline-flex items-center text-blue-600 hover:text-blue-900"
-                        disabled={order.status === 'approved'}
+                        disabled={order.status === "approved"}
                       >
                         <PenTool className="h-4 w-4 mr-1" />
                         Sign
@@ -190,20 +259,7 @@ export function OrderDashboard() {
         </div>
       </main>
 
-      {showOrderForm && (
-        <OrderForm
-          onSubmit={async (formData) => {
-            try {
-              await useOrderStore.getState().createOrder(formData);
-              toast.success('Order created successfully');
-              setShowOrderForm(false);
-            } catch (error) {
-              toast.error('Failed to create order');
-            }
-          }}
-          onCancel={() => setShowOrderForm(false)}
-        />
-      )}
+      {showOrderForm && <OrderForm onCancel={() => setShowOrderForm(false)} />}
 
       {showSignaturePad && (
         <SignaturePad

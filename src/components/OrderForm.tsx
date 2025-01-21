@@ -1,40 +1,44 @@
 import React, { useState } from 'react';
-import { Upload, X } from 'lucide-react';
+import { Upload } from "lucide-react";
 import { supabase } from '../lib/supabase';
 import { useOrderStore } from '../stores/orderStore';
+import toast from "react-hot-toast";
 
 interface OrderFormProps {
-  onSubmit: (data: FormData) => void;
   onCancel: () => void;
 }
 
-export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [department, setDepartment] = useState('');
+export function OrderForm({ onCancel }: OrderFormProps) {
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [department, setDepartment] = useState("");
   const [file, setFile] = useState<File | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (!file) {
-      throw new Error('Please upload a file');
+      toast.error("Please upload a file");
+      return;
     }
 
+    setIsSubmitting(true);
+
     try {
-      // First upload the file to storage
+      // Step 1: Upload the file first
       const { data: fileData, error: uploadError } = await supabase.storage
-        .from('documents')
+        .from("documents")
         .upload(`orders/${Date.now()}-${file.name}`, file);
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL
-      const { data: { publicUrl } } = supabase.storage
-        .from('documents')
-        .getPublicUrl(fileData.path);
+      // Step 2: Get the public URL of the uploaded file
+      const {
+        data: { publicUrl },
+      } = supabase.storage.from("documents").getPublicUrl(fileData.path);
 
-      // Create the order with the file URL
+      // Step 3: Create the order with the file URL
       await useOrderStore.getState().createOrder({
         title,
         description,
@@ -43,17 +47,13 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
         pdfUrl: publicUrl,
       });
 
-      // Create FormData for any additional handling
-      const formData = new FormData();
-      formData.append('title', title);
-      formData.append('description', description);
-      formData.append('department', department);
-      formData.append('document', file);
-
-      onSubmit(formData);
+      toast.success("Order created successfully");
+      onCancel(); // Close the form
     } catch (error) {
-      console.error('Error submitting form:', error);
-      throw error;
+      console.error("Error submitting form:", error);
+      toast.error("Failed to create order");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -71,7 +71,9 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Description</label>
+        <label className="block text-sm font-medium text-gray-700">
+          Description
+        </label>
         <textarea
           value={description}
           onChange={(e) => setDescription(e.target.value)}
@@ -82,7 +84,9 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Department</label>
+        <label className="block text-sm font-medium text-gray-700">
+          Department
+        </label>
         <select
           value={department}
           onChange={(e) => setDepartment(e.target.value)}
@@ -98,7 +102,9 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
       </div>
 
       <div>
-        <label className="block text-sm font-medium text-gray-700">Document Scan</label>
+        <label className="block text-sm font-medium text-gray-700">
+          Document Scan
+        </label>
         <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
           <div className="space-y-1 text-center">
             <Upload className="mx-auto h-12 w-12 text-gray-400" />
@@ -108,16 +114,12 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
                 <input
                   type="file"
                   className="sr-only"
-                  accept="image/*,.pdf"
+                  accept=".pdf"
                   onChange={(e) => setFile(e.target.files?.[0] || null)}
                 />
               </label>
             </div>
-            {file && (
-              <p className="text-sm text-gray-500">
-                {file.name}
-              </p>
-            )}
+            {file && <p className="text-sm text-gray-500">{file.name}</p>}
           </div>
         </div>
       </div>
@@ -127,14 +129,16 @@ export function OrderForm({ onSubmit, onCancel }: OrderFormProps) {
           type="button"
           onClick={onCancel}
           className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50"
+          disabled={isSubmitting}
         >
           Cancel
         </button>
         <button
           type="submit"
-          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700"
+          className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 disabled:opacity-50"
+          disabled={isSubmitting}
         >
-          Submit Order
+          {isSubmitting ? "Submitting..." : "Submit Order"}
         </button>
       </div>
     </form>
