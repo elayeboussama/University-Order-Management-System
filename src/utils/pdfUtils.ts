@@ -1,5 +1,5 @@
-import { PDFDocument, rgb } from 'pdf-lib';
-import { supabase } from '../lib/supabase';
+import { PDFDocument, rgb } from "pdf-lib";
+import { supabase } from "../lib/supabase";
 
 interface SignaturePdfParams {
   pdfUrl: string;
@@ -14,87 +14,97 @@ export async function addSignatureToPdf({
   signatureData,
   signerRole,
   signerName,
-  coordinates
+  coordinates,
 }: SignaturePdfParams): Promise<string> {
-  // Fetch the PDF
-  const pdfResponse = await fetch(pdfUrl);
-  const pdfBytes = await pdfResponse.arrayBuffer();
+  try {
+    // Fetch the PDF
+    const pdfResponse = await fetch(pdfUrl);
+    const pdfBytes = await pdfResponse.arrayBuffer();
 
-  // Load the PDF document
-  const pdfDoc = await PDFDocument.load(pdfBytes);
-  const pages = pdfDoc.getPages();
-  const firstPage = pages[0];
+    // Load the PDF document
+    const pdfDoc = await PDFDocument.load(pdfBytes);
+    const pages = pdfDoc.getPages();
+    const firstPage = pages[0];
 
-  // Convert signature data URL to image
-  const signatureImage = await pdfDoc.embedPng(signatureData);
-  
-  // Add signature image to the PDF
-  firstPage.drawImage(signatureImage, {
-    x: coordinates.x,
-    y: coordinates.y,
-    width: 100, // Adjust size as needed
-    height: 50,
-  });
+    // Convert signature data URL to image
+    // Remove the data URL prefix to get just the base64 string
+    const signatureBase64 = signatureData.split(",")[1];
+    const signatureBytes = Uint8Array.from(atob(signatureBase64), (c) =>
+      c.charCodeAt(0)
+    );
+    const signatureImage = await pdfDoc.embedPng(signatureBytes);
 
-  // Add signature metadata (name and role)
-  firstPage.drawText(`${signerName} (${signerRole})`, {
-    x: coordinates.x,
-    y: coordinates.y - 20,
-    size: 10,
-    color: rgb(0, 0, 0),
-  });
+    // Add signature image to the PDF
+    firstPage.drawImage(signatureImage, {
+      x: coordinates.x,
+      y: coordinates.y,
+      width: 100,
+      height: 50,
+    });
 
-  // Save the modified PDF
-  const modifiedPdfBytes = await pdfDoc.save();
+    // Add signature metadata (name and role)
+    firstPage.drawText(`${signerName} (${signerRole})`, {
+      x: coordinates.x,
+      y: coordinates.y - 20,
+      size: 10,
+      color: rgb(0, 0, 0),
+    });
 
-  // Convert to base64 or upload to your storage and return the URL
-  // This is just an example - you'll need to implement your own storage solution
-  const base64String = Buffer.from(modifiedPdfBytes).toString('base64');
-  const newPdfUrl = await uploadPdfToStorage(base64String); // You'll need to implement this
+    // Save the modified PDF
+    const modifiedPdfBytes = await pdfDoc.save();
 
-  return newPdfUrl;
+    // Convert ArrayBuffer to base64 string
+    const base64String = btoa(
+      new Uint8Array(modifiedPdfBytes).reduce(
+        (data, byte) => data + String.fromCharCode(byte),
+        ""
+      )
+    );
+
+    // Upload the modified PDF
+    const newPdfUrl = await uploadPdfToStorage(base64String);
+    return newPdfUrl;
+  } catch (error) {
+    console.error("Error modifying PDF:", error);
+    throw new Error("Failed to add signature to PDF");
+  }
 }
 
 async function uploadPdfToStorage(base64Pdf: string): Promise<string> {
   try {
     // Convert base64 to Blob
-    const pdfBlob = base64ToBlob(base64Pdf, 'application/pdf');
-    
+    const byteCharacters = atob(base64Pdf);
+    const byteNumbers = new Array(byteCharacters.length);
+
+    for (let i = 0; i < byteCharacters.length; i++) {
+      byteNumbers[i] = byteCharacters.charCodeAt(i);
+    }
+
+    const byteArray = new Uint8Array(byteNumbers);
+    const pdfBlob = new Blob([byteArray], { type: "application/pdf" });
+
     // Generate a unique filename
     const filename = `signatures/${Date.now()}-signed.pdf`;
-    
+
     // Upload to Supabase Storage
-    const { data, error } = await supabase.storage
-      .from('documents')
+    const { error } = await supabase.storage
+      .from("documents")
       .upload(filename, pdfBlob, {
-        contentType: 'application/pdf',
-        cacheControl: '3600',
-        upsert: false
+        contentType: "application/pdf",
+        cacheControl: "3600",
+        upsert: false,
       });
 
     if (error) throw error;
 
     // Get the public URL for the uploaded file
-    const { data: { publicUrl } } = supabase.storage
-      .from('documents')
-      .getPublicUrl(filename);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("documents").getPublicUrl(filename);
 
     return publicUrl;
   } catch (error) {
-    console.error('Error uploading PDF:', error);
-    throw new Error('Failed to upload signed PDF');
+    console.error("Error uploading PDF:", error);
+    throw new Error("Failed to upload signed PDF");
   }
 }
-
-// Helper function to convert base64 to Blob
-function base64ToBlob(base64: string, type: string): Blob {
-  const byteCharacters = Buffer.from(base64, 'base64').toString('binary');
-  const byteNumbers = new Array(byteCharacters.length);
-  
-  for (let i = 0; i < byteCharacters.length; i++) {
-    byteNumbers[i] = byteCharacters.charCodeAt(i);
-  }
-  
-  const byteArray = new Uint8Array(byteNumbers);
-  return new Blob([byteArray], { type });
-} 

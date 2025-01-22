@@ -1,18 +1,18 @@
-import React, { useEffect, useState } from 'react';
 import {
+  Download,
   FileText,
-  PlusCircle,
-  Search,
   LogOut,
   PenTool,
-  Download,
+  PlusCircle,
+  Search,
 } from "lucide-react";
+import { useEffect, useState } from "react";
+import toast from "react-hot-toast";
+import { useAuthStore } from "../stores/authStore";
+import { useOrderStore } from "../stores/orderStore";
+import { addSignatureToPdf } from "../utils/pdfUtils";
 import { OrderForm } from "./OrderForm";
 import { SignaturePad } from "./SignaturePad";
-import { useOrderStore } from "../stores/orderStore";
-import { useAuthStore } from "../stores/authStore";
-import toast from "react-hot-toast";
-import { addSignatureToPdf } from "../utils/pdfUtils";
 
 export function OrderDashboard() {
   const { orders, loading, loadOrders, addSignature, updateOrderPdf } =
@@ -27,36 +27,38 @@ export function OrderDashboard() {
     loadOrders();
   }, [loadOrders]);
 
-  const handleSignature = async (signatureData: string) => {
-    if (!selectedOrder) return;
-
+  const handleSignatureSave = async (signatureData: string) => {
     try {
-      // Get the order's PDF URL
+      if (!selectedOrder || !user) return;
+
       const order = orders.find((o) => o.id === selectedOrder);
       if (!order?.pdfUrl) {
-        throw new Error("PDF not found");
+        throw new Error("PDF URL not found");
       }
 
-      // First add signature to the database
-      await addSignature(selectedOrder, signatureData);
+      // Get signature coordinates based on user role
+      const coordinates = getSignatureCoordinates(user.role);
 
-      // Then add signature to the PDF
-      const updatedPdfUrl = await addSignatureToPdf({
+      // Add signature to PDF
+      const newPdfUrl = await addSignatureToPdf({
         pdfUrl: order.pdfUrl,
         signatureData,
-        signerRole: user?.role || "",
-        signerName: user?.fullName || "",
-        coordinates: getSignatureCoordinates(user?.role || ""), // Helper to determine where to place signature
+        signerRole: user.role,
+        signerName: user.fullName,
+        coordinates,
       });
 
-      // Update the order with new PDF URL
-      await updateOrderPdf(selectedOrder, updatedPdfUrl);
+      // Save signature to database
+      await addSignature(selectedOrder, signatureData);
+
+      // Update PDF URL in database
+      await updateOrderPdf(selectedOrder, newPdfUrl);
 
       toast.success("Signature added successfully");
       setShowSignaturePad(false);
       setSelectedOrder(null);
     } catch (error) {
-      console.error("Signature error:", error);
+      console.error("Error adding signature:", error);
       toast.error("Failed to add signature");
     }
   };
@@ -76,8 +78,6 @@ export function OrderDashboard() {
   };
 
   const handleDownloadPdf = async (pdfUrl: string, orderTitle: string) => {
-     
-
     try {
       const response = await fetch(pdfUrl);
       const blob = await response.blob();
@@ -196,9 +196,9 @@ export function OrderDashboard() {
                       <FileText className="h-5 w-5 text-gray-400 mr-2" />
                       <div>
                         <button
-                          onClick={() => 
+                          onClick={() =>
                             order.pdfUrl &&
-                              handleDownloadPdf(order.pdfUrl, order.title)
+                            handleDownloadPdf(order.pdfUrl, order.title)
                           }
                           className="group flex items-center"
                         >
@@ -236,21 +236,23 @@ export function OrderDashboard() {
                     {order.signatures.length} / 2
                   </td>
                   <td className="px-6 py-4 text-sm font-medium">
-                    {["director", "secretary", "responsible"].includes(
-                      user?.role || ""
-                    ) && (
-                      <button
-                        onClick={() => {
-                          setSelectedOrder(order.id);
-                          setShowSignaturePad(true);
-                        }}
-                        className="inline-flex items-center text-blue-600 hover:text-blue-900"
-                        disabled={order.status === "approved"}
-                      >
-                        <PenTool className="h-4 w-4 mr-1" />
-                        Sign
-                      </button>
-                    )}
+                    <div className="flex items-center space-x-4">
+                      {["director", "secretary", "responsible"].includes(
+                        user?.role || ""
+                      ) && (
+                        <button
+                          onClick={() => {
+                            setSelectedOrder(order.id);
+                            setShowSignaturePad(true);
+                          }}
+                          className="inline-flex items-center text-blue-600 hover:text-blue-900"
+                          disabled={order.status === "approved"}
+                        >
+                          <PenTool className="h-4 w-4 mr-1" />
+                          Sign
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -259,12 +261,13 @@ export function OrderDashboard() {
         </div>
       </main>
 
-      {showOrderForm && <OrderForm onCancel={() => setShowOrderForm(false)} />}
+      <OrderForm open={showOrderForm} onClose={() => setShowOrderForm(false)} />
 
       {showSignaturePad && (
         <SignaturePad
-          onSave={handleSignature}
-          onCancel={() => {
+          open={showSignaturePad}
+          onSave={handleSignatureSave}
+          onClose={() => {
             setShowSignaturePad(false);
             setSelectedOrder(null);
           }}
